@@ -21,5 +21,5 @@ DIR=$HOME/facenet_feature_extractor
 cd $DIR
 echo `pwd`
 
-# python extract.py --batch_size=128 --gpu_number=0 --path_video_csv data/video_paths_dummy.csv
-python npy2hdf5.py  #--out_path '/home/pardogl/scratch/data/movies/'
+python extract.py --batch_size=512 --gpu_number=0 --path_video_csv data/video_paths.csv
+python npy2hdf5.py  --out_path '/home/pardogl/scratch/data/movies/'
