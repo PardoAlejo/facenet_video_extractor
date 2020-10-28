@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import numpy as np
 import ffmpeg
+import logging
 
 class FrameLoader(Dataset):
     """Pytorch video loader."""
@@ -21,6 +22,7 @@ class FrameLoader(Dataset):
         Args:
         """
         self.csv = pd.read_csv(videos_csv)
+        logging.info(f'Extracting faces for {len(self.csv)} videos')
         self._set_video_duration(durations_csv)
         self.centercrop = centercrop
         self.width = width
@@ -70,7 +72,7 @@ class FrameLoader(Dataset):
                 h, w = self._get_video_dim(video_path)
             except:
                 print('ffprobe failed at: {}'.format(video_path))
-                return th.zeros(1), video_path, output_file
+                return th.zeros(1), output_file
 
             # height, width = self._get_output_dim(self.height, self.width)
             cmd = (
@@ -85,7 +87,6 @@ class FrameLoader(Dataset):
             )
             video = np.frombuffer(out, np.uint8).reshape([-1, self.height, self.width, 3])
             video = th.from_numpy(video.astype('float32'))[:duration,:,:,:]
-            video = video.permute(0, 1, 2, 3)
         else:
             video = th.zeros(1)
             

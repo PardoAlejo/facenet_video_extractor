@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from facenet_pytorch import MTCNN, InceptionResnetV1
 import tqdm
-
+import logging
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -52,28 +52,35 @@ def main():
 
     num_frames = 0
     num_faces = 0
-    print(f"Extracting faces feature with maximum {max_faces} faces per frame")
+    logging.info(f"Extracting faces feature with maximum {max_faces} faces per frame")
     with th.no_grad():
         for images, out_path in tqdm.tqdm(dataloader):
-            images = images.squeeze()
-            n_chunk = images.shape[0]
-            num_frames =+ n_chunk
-            features = th.cuda.FloatTensor(n_chunk, feat_dim).fill_(0)
-            n_iter = int(np.ceil(n_chunk / float(args.batch_size)))
-            for i in range(n_iter):
-                min_ind = i * args.batch_size
-                max_ind = (i + 1) * args.batch_size
-                images_batch = images[min_ind:max_ind]
-                faces_batch, probs = mtcnn(images_batch, return_prob=True)
-                num_faces += len(faces_batch)
-                embeddings = th.stack([F.pad(resnet(faces[0:max_faces]).view(-1), (0,1024-(512*faces[0:max_faces].shape[0]))) 
-                            if (faces is not None and prob.any()>0.9) else th.zeros(feat_dim) for faces,prob in zip(faces_batch,probs)],dim=0)
+            if len(images.shape) > 3:
+                images = images.squeeze(0)
+                n_chunk = images.shape[0]
+                num_frames =+ n_chunk
+                features = th.cuda.FloatTensor(n_chunk, feat_dim).fill_(0)
+                n_iter = int(np.ceil(n_chunk / float(args.batch_size)))
+                for i in range(n_iter):
+                    min_ind = i * args.batch_size
+                    max_ind = (i + 1) * args.batch_size
+                    images_batch = images[min_ind:max_ind]
+                    try:
+                        faces_batch, probs = mtcnn(images_batch, return_prob=True)
+                        num_faces += len(faces_batch)
+                        embeddings = th.stack([F.pad(resnet(faces[0:max_faces]).view(-1), (0,1024-(512*faces[0:max_faces].shape[0]))) 
+                                    if (faces is not None and prob.any()>0.9) else th.zeros(feat_dim) for faces,prob in zip(faces_batch,probs)],dim=0)
+                    except:
+                        print(f"Error in processing faces of video: {out_path}")
+                        continue
 
-                features[min_ind:max_ind] = embeddings
-            features = features.cpu().numpy()
-            np.save(out_path[0], features)
+                    features[min_ind:max_ind] = embeddings
+                features = features.cpu().numpy()
+                np.save(out_path[0], features)
+            else:
+                print(f'Video {out_path} already processed.')
         
-        print(f'Done, average number of faces per frame: {num_faces/num_frames}')
+        logging.info(f'Done, average number of faces per frame: {num_faces/num_frames}')
         
 
 if __name__ == "__main__":
